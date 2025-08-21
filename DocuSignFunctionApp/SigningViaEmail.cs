@@ -4,7 +4,9 @@
 using System;
 using System.Collections.Generic;
 using System.Reflection.Metadata;
+using System.Runtime.Serialization.DataContracts;
 using System.Text;
+using System.Xml.Linq;
 using DocuSign.eSign.Api;
 using DocuSign.eSign.Client;
 using DocuSign.eSign.Model;
@@ -30,10 +32,10 @@ namespace ESignature.Examples
         /// <param name="docDocx">String of bytes representing the Word document (docx)</param>
         /// <param name="envStatus">Status to set the envelope to</param>
         /// <returns>EnvelopeId for the new envelope</returns>
-        public static string SendEnvelopeViaEmail(string signerEmail, string signerName, string ccEmail, string ccName, string accessToken, string basePath, string accountId, string blobConnectionString, string blobContainerName, string envStatus)
+        public static string SendEnvelopeViaEmail(XDocument xmlDoc, string signerEmail, string signerName, string ccEmail, string ccName, string accessToken, string basePath, string accountId, string blobConnectionString, string blobContainerName, string envStatus)
         {
             //ds-snippet-start:eSign2Step3
-            EnvelopeDefinition env = MakeEnvelope(signerEmail, signerName, ccEmail, ccName, blobConnectionString, blobContainerName, envStatus);
+            EnvelopeDefinition env = MakeEnvelope(xmlDoc, signerEmail, signerName, ccEmail, ccName, blobConnectionString, blobContainerName, envStatus);
             var docuSignClient = new DocuSignClient(basePath);
             docuSignClient.Configuration.DefaultHeader.Add("Authorization", "Bearer " + accessToken);
 
@@ -43,7 +45,7 @@ namespace ESignature.Examples
             //ds-snippet-end:eSign2Step
         }
 
-        public static EnvelopeDefinition MakeEnvelope(string signerEmail, string signerName, string ccEmail, string ccName, string blobConnectionString, string blobContainerName, string envStatus)
+        public static EnvelopeDefinition MakeEnvelope(XDocument xmlDoc, string signerEmail, string signerName, string ccEmail, string ccName, string blobConnectionString, string blobContainerName, string envStatus)
         {
             // Data for this method
             // signerEmail
@@ -65,40 +67,52 @@ namespace ESignature.Examples
             // After it is signed, a copy is sent to the cc person.
             // read files from a local directory
             // The reads could raise an exception if the file is not available!
-            BlobFileService blobFileService = new BlobFileService(blobConnectionString, blobContainerName);
-            string doc3PdfBytes = blobFileService.GetBlobAsBase64Async("World_Wide_Corp_lorem.pdf");
-            string doc2DocxBytes = blobFileService.GetBlobAsBase64Async("World_Wide_Corp_salary.docx");
+            //BlobFileService blobFileService = new BlobFileService(blobConnectionString, blobContainerName);
+            //string doc3PdfBytes = blobFileService.GetBlobAsBase64Async("World_Wide_Corp_lorem.pdf");
+            //string doc2DocxBytes = blobFileService.GetBlobAsBase64Async("World_Wide_Corp_salary.docx");
+            List<DocuSign.eSign.Model.Document> _documentList = new List<DocuSign.eSign.Model.Document>();
+            int count = 1;
+            foreach (XElement xDocument in xmlDoc.Root.Elements("OnlineData.getAttachmentRs"))
+            {
 
-
+                DocuSign.eSign.Model.Document document = new DocuSign.eSign.Model.Document();
+                document.Name = xDocument.Attribute("filename")?.Value ?? "Document";
+                document.FileExtension = "pdf";
+                document.DocumentBase64 = xDocument.Element("base64").ToString();
+                document.DocumentId = count.ToString(); // Default to "1" if not specified
+                count++;
+                _documentList.Add(document);
+            }
+           
             //ds-snippet-start:eSign2Step2
             EnvelopeDefinition env = new EnvelopeDefinition();
             env.EmailSubject = "Please sign this document set";
 
             // Create document objects, one per document
-            DocuSign.eSign.Model.Document doc1 = new DocuSign.eSign.Model.Document();
-            string b64 = Convert.ToBase64String(Document1(signerEmail, signerName, ccEmail, ccName));
-            doc1.DocumentBase64 = b64;
-            doc1.Name = "Order acknowledgement"; // can be different from actual file name
-            doc1.FileExtension = "html"; // Source data format. Signed docs are always pdf.
-            doc1.DocumentId = "1"; // a label used to reference the doc            
-            DocuSign.eSign.Model.Document doc2 = new DocuSign.eSign.Model.Document
-            {
-                DocumentBase64 = doc2DocxBytes,
-                Name = "Battle Plan", // can be different from actual file name
-                FileExtension = "docx",
-                DocumentId = "2",
+            //DocuSign.eSign.Model.Document doc1 = new DocuSign.eSign.Model.Document();
+            //string b64 = Convert.ToBase64String(Document1(signerEmail, signerName, ccEmail, ccName));
+            //doc1.DocumentBase64 = b64;
+            //doc1.Name = "Order acknowledgement"; // can be different from actual file name
+            //doc1.FileExtension = "html"; // Source data format. Signed docs are always pdf.
+            //doc1.DocumentId = "1"; // a label used to reference the doc            
+            //DocuSign.eSign.Model.Document doc2 = new DocuSign.eSign.Model.Document
+            //{
+            //    DocumentBase64 = doc2DocxBytes,
+            //    Name = "Battle Plan", // can be different from actual file name
+            //    FileExtension = "docx",
+            //    DocumentId = "2",
 
-            };
-            DocuSign.eSign.Model.Document doc3 = new DocuSign.eSign.Model.Document
-            {
-                DocumentBase64 = doc3PdfBytes,
-                Name = "Lorem Ipsum", // can be different from actual file name
-                FileExtension = "pdf",
-                DocumentId = "3",
-            };
+            //};
+            //DocuSign.eSign.Model.Document doc3 = new DocuSign.eSign.Model.Document
+            //{
+            //    DocumentBase64 = doc3PdfBytes,
+            //    Name = "Lorem Ipsum", // can be different from actual file name
+            //    FileExtension = "pdf",
+            //    DocumentId = "3",
+            //};
 
-            // The order in the docs array determines the order in the envelope
-            env.Documents = new List<DocuSign.eSign.Model.Document> { doc1, doc2, doc3 };
+            //// The order in the docs array determines the order in the envelope
+            //env.Documents = new List<DocuSign.eSign.Model.Document> { doc1, doc2, doc3 };
 
             // create a signer recipient to sign the document, identified by name and email
             // We're setting the parameters via the object creation
@@ -164,17 +178,21 @@ namespace ESignature.Examples
 
             EventNotification eventNotification = new EventNotification
             {
-                Url = "http://localhost:7158/api/DocuSignWebHook",
-                IncludeDocuments = "true",
+                Url = "https://docusingazfunc-csbvgefmcca9h9e8.australiaeast-01.azurewebsites.net/api/DocuSignWebHook",
+                IncludeDocuments = "false",
                 EnvelopeEvents = new List<EnvelopeEvent>
                 {
-                    new EnvelopeEvent { EnvelopeEventStatusCode = "completed" }
+                    new EnvelopeEvent { EnvelopeEventStatusCode = "sent" },
+                new EnvelopeEvent { EnvelopeEventStatusCode = "delivered" },
+                new EnvelopeEvent { EnvelopeEventStatusCode = "completed" },
+                new EnvelopeEvent { EnvelopeEventStatusCode = "declined" },
+                new EnvelopeEvent { EnvelopeEventStatusCode = "voided" }
                 }
-               
+
 
             };
 
-
+            env.EventNotification = eventNotification;
 
 
             // Request that the envelope be sent by setting |status| to "sent".

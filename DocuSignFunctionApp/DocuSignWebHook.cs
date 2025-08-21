@@ -19,14 +19,23 @@ public class DocuSignWebHook
     {
         _logger.LogInformation("C# HTTP trigger function processed a request.");
         _logger.LogInformation("Request method: {method}", req.Method);
-        // Log headers
-        foreach (var header in req.Headers)
+        try
         {
-            _logger.LogInformation("Header: {key} = {value}", header.Key, string.Join(", ", header.Value));
+            foreach (var header in req.Headers)
+            {
+                _logger.LogInformation("Header: {key} = {value}", header.Key, string.Join(", ", header.Value));
+            }
+            // Read and log body
+            var requestBody = new StreamReader(req.Body).ReadToEndAsync();
+            _logger.LogInformation("Request body: {body}", requestBody.Result);
         }
-        // Read and log body
-        var requestBody = new StreamReader(req.Body).ReadToEnd();
-        _logger.LogInformation("Request body: {body}", requestBody);
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "An error occurred while processing the request.");
+            return new StatusCodeResult(StatusCodes.Status500InternalServerError);
+        }
+        // Log headers
+       
         return new OkObjectResult("Welcome to Azure Functions!");
     }
 }

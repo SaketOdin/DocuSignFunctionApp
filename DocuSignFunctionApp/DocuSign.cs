@@ -1,10 +1,13 @@
 ﻿using System.Configuration;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using System.Xml.Linq;
 using DocuSign.CodeExamples.Authentication;
 using DocuSign.CodeExamples.Common;
 using DocuSign.eSign.Client;
 using ESignature.Examples;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using static DocuSign.eSign.Client.Auth.OAuth;
 using static DocuSign.eSign.Client.Auth.OAuth.UserInfo;
 using UserInfo = DocuSign.eSign.Client.Auth.OAuth.UserInfo;
@@ -14,7 +17,7 @@ namespace DocuSignFunctionApp
     public  class CustomDocuSign
     {
         public readonly string DevCenterPage = "https://developers.docusign.com/platform/auth/consent";
-        public void InvokeDocusign(string signerEmail, string signerName, string ccEmail,string ccName,string clientId, string ImpersonatedUserId, string AuthServer ,byte[] PrivateKeybyte, string blobConnectionString, string blobContainerName)
+        public void InvokeDocusign(XDocument xmlDoc,string signerEmail, string signerName, string ccEmail,string ccName,string clientId, string ImpersonatedUserId, string AuthServer ,byte[] PrivateKeybyte, string blobConnectionString, string blobContainerName)
         {
             Console.ForegroundColor = ConsoleColor.White;
             OAuthToken accessToken = null;
@@ -69,10 +72,17 @@ namespace DocuSignFunctionApp
             UserInfo userInfo = docuSignClient.GetUserInfo(accessToken.access_token);
             Account acct = userInfo.Accounts.FirstOrDefault();
 
-            
-            string envelopeId = SigningViaEmail.SendEnvelopeViaEmail(signerEmail, signerName, ccEmail, ccName, accessToken.access_token, acct.BaseUri + "/restapi", acct.AccountId, blobConnectionString, blobContainerName, "sent");
-            
-            Console.ForegroundColor = ConsoleColor.White;
+            try
+            {
+
+                string envelopeId = SigningViaEmail.SendEnvelopeViaEmail(xmlDoc, signerEmail, signerName, ccEmail, ccName, accessToken.access_token, acct.BaseUri + "/restapi", acct.AccountId, blobConnectionString, blobContainerName, "sent");
+            }
+            catch (Exception ex)
+            {
+
+                throw new Exception($"Error while sending envelope: {ex.Message}", ex);
+            }
+                Console.ForegroundColor = ConsoleColor.White;
             
 
         }
